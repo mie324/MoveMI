@@ -398,14 +398,18 @@ if __name__ == '__main__':
 
 
     '''
-    0 - fist clench, arm out forward
-    1 - hand wide open, arm down
-    2 - finger gun with thumb up, arm out to the side 
-    3 - rock symbol, arm down
+    0 - fist clench
+    1 - hand wide open
+    2 - finger gun with thumb up
+    3 - rock symbol
+    4 - scissors
+    5 - middle finger
+    6 - thumbs up
+    7 - spock
     '''
-    label = 3
+    label = 5
 
-    participant = "Jay2"
+    participant = "Jennifer"
 
     currValues = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
