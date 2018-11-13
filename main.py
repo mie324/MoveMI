@@ -16,6 +16,8 @@ from torch.utils.data import DataLoader
 from dataset import signalDataset;
 from model import ConvolutionalNeuralNetwork;
 
+import os
+
 seed = 0;
 torch.manual_seed(0);
 numpy.random.seed(0);
@@ -29,9 +31,18 @@ epochTrack = [];
 filename = '' + '.npy';
 
 def recieveData():
-    raw = numpy.load(filename);
-    rawL = raw[:,-1];
-    rawV = numpy.delete(raw, -1, axis=1);
+    #raw = numpy.loadtxt("LabelledData.csv", delimiter=",");
+    raw = numpy.array([])
+
+    for data_csv in os.listdir("./data"):
+        if data_csv.endswith(".csv"):
+            if len(raw) == 0:
+                raw = numpy.loadtxt("./data/" + data_csv, delimiter=",")
+            else:
+                raw = numpy.vstack((raw, numpy.genfromtxt("./data/" + data_csv, delimiter=",")))
+
+    rawL = raw[:,-1]
+    rawV = numpy.delete(raw, -1, axis=1)
 
     return rawV, rawL;
 
@@ -45,10 +56,31 @@ def modifyData(rawV, rawL):
     ohe = OneHotEncoder();
     oneHotLabels = ohe.fit_transform(oneHotLabels.reshape(-1,1)).toarray();
     Ndata = normalized.transpose((0,2,1));
-
     '''
-    pass
-    #return modV, modL
+    #for i in range(0, rawV.shape[1]):
+    #    mean = numpy.sum(rawV[:, i])
+    #    mean /= rawV.shape[1]
+    #    std = 0
+    #    for j in range(0, rawV.shape[0]):
+    #        std += (rawV[j, i] - mean) ** 2
+    #    std / rawV.shape[1]
+    #    std = std ** (1/2)
+    #    for j in range(0, rawV.shape[0]):
+    #        rawV[j, i] = (rawV[j, i] - mean) / std
+
+    rawV = numpy.expand_dims(rawV, axis=0) # Temporary to create correct shape
+    rawV = rawV.transpose((1, 2, 0))
+
+    label_encoder = LabelEncoder()
+    onehot_encoder = OneHotEncoder()
+    labels = label_encoder.fit_transform(rawL)
+    labels = labels.reshape(-1,1)
+    labels = onehot_encoder.fit_transform(labels).toarray()
+
+    modV = rawV
+    modL = labels
+
+    return modV, modL
 
 def loadSplitData(modV, modL, batch_size):
 # Split the data then load
@@ -71,8 +103,8 @@ def loadData(modV, modL):
 
     return TestLoad;
 
-def load_model(lr):
-    model = ConvolutionalNeuralNetwork();
+def load_model(lr, input_size, output_size):
+    model = ConvolutionalNeuralNetwork(input_size, output_size);
     loss_fnc = torch.nn.MSELoss();
     optimizer = torch.optim.Adam(model.parameters(), lr= lr);
 
@@ -84,7 +116,7 @@ def evaluate(model, Vload):
     for index, vBatchData in enumerate(Vload):
         vfeature, vlabel = vBatchData;
 
-        outs = model(vfeature.float(), vfeature.size(0));
+        outs = model(vfeature.float());
 
         corr = (torch.argmax(outs.squeeze(), dim=1) == torch.argmax(vlabel, dim=1))
 
@@ -95,84 +127,64 @@ def evaluate(model, Vload):
 #######################################################################################################################
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--lr', type=float, default= 0.0001)
-    parser.add_argument('--epochs', type=int, default=100)
-    parser.add_argument('--eval_every', type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=128)
+    #parser.add_argument('--lr', type=float, default= 0.1)
+    parser.add_argument('--lr', type=float, default= 0.001)
+    parser.add_argument('--epochs', type=int, default= 16)
+    parser.add_argument('--eval_every', type=int, default=(128 * 2) - 1)
     parser.add_argument('--training_mode', type=bool, default=True, help='True = training | False = inference')
 
     args = parser.parse_args()
 
-    modV, modL = modifyData(recieveData());
+    rawV, rawL = recieveData()
+    modV, modL = modifyData(rawV, rawL);
 
 
     if(args.training_mode):
-        print('load');
+        t = 0
 
-        Tload, Vload = loadSplitData(modV, modL, args.batch_size);
-        model, loss_func, optimizer = load_model(args.lr);
+        model, loss_func, optimizer = load_model(args.lr, modV.shape[1], modL.shape[1])
 
-        runningLoss = 0.0;
-        correctPredictions = 0;
-        corrPredictsPerStep = 0;
-        totalEpochs = 0;
-        evalFrequency = 1;
+        curr_max_valid_accuracy = 0
+        curr_max_index = 0
 
-        totalCasesRun = 0;
+        for epoch in range(args.epochs):
+            accumulated_loss = 0
+            total_correct = 0
 
-        bestValAcc = 0;
-        bestEpoch = 0;
+            train_loader, val_loader = loadSplitData(modV, modL, args.batch_size)
 
-        print('start');
+            for i, batch in enumerate(train_loader):
+                instances, label = batch
+                optimizer.zero_grad()
 
-        for epochCount in range(args.epochs):
-            for index, batchData in enumerate(Tload):
-                ins, labs = batchData;
+                predictions = model(instances.float())
 
-                optimizer.zero_grad();
+                batch_loss = loss_func(input=predictions.squeeze(), target=label.float())
+                accumulated_loss += batch_loss
+                batch_loss.backward()
 
-                outs = model.forward(ins.float(), ins.size(0));
-                outs = outs.squeeze();
+                optimizer.step()
 
-                loss = loss_func(outs, labs.float());
-                runningLoss += loss;
-
-                loss.backward();
-                optimizer.step();
-
-                corr = (torch.argmax(outs.squeeze(), dim=1) == torch.argmax(labs, dim=1))
-                correctPredictions += int(corr.sum());
-                corrPredictsPerStep += int(corr.sum());
-
-                totalCasesRun += corr.size(0);
-
-            if (totalEpochs + 1) % evalFrequency == 0:
-                epochTrack.append(totalEpochs+1);
-
-                v_accuracy = evaluate(model, Vload);
-
-                valAcc.append(v_accuracy);
-
-                t_accuracy = corrPredictsPerStep / (totalCasesRun);
-                corrPredictsPerStep = 0;
-                totalCasesRun = 0;
-
-                trainAcc.append(t_accuracy);
-
-                print("Epoch Number: {} , Step {} | Loss: {} | Validation Accuracy: {} | Training Accuracy: {}".format(epochCount+1, totalEpochs+1, runningLoss/100, v_accuracy, t_accuracy));
-
-                runningLoss = 0;
-
-                if(v_accuracy > bestValAcc):
-                    torch.save(model, 'model.pt');
-                    bestEpoch = totalEpochs+1;
-                    bestValAcc = v_accuracy;
-
-            totalEpochs += 1;
+                num_correct = torch.argmax(predictions.squeeze(), dim=1) == torch.argmax(label, dim=1)
+                total_correct += int(num_correct.sum())
 
 
-        print("Total Training Accuracy: {}".format( float(correctPredictions)/(len(Tload.dataset) * args.epochs)));
-        print("Best Validation Accuracy represented in model at epoch {}".format(bestEpoch));
+                if(t % args.eval_every == 0):
+                    train_accuracy = evaluate(model, train_loader)
+                    valid_accuracy = evaluate(model, val_loader)
+
+                    print("Epoch: {}, Step {} | Loss: {} | Number correct: {} | Train accuracy: {} | Validation accuracy: {}".format(epoch + 1, t + 1, accumulated_loss / 100, total_correct, train_accuracy, valid_accuracy))
+
+                    if(valid_accuracy > curr_max_valid_accuracy):
+                        curr_max_valid_accuracy = valid_accuracy
+                        curr_max_index = t
+
+                    accumulated_loss = 0
+
+                t += 1
+
+        print("Max Validation Accuracy: {} | Occurs at: {}".format(curr_max_valid_accuracy, curr_max_index))
 
     else:
         try:
