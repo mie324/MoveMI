@@ -12,6 +12,7 @@ from serial.tools.list_ports import comports
 
 import struct
 import numpy as np
+import copy
 
 import socket
 import torch
@@ -64,11 +65,12 @@ class BT(object):
         self.lock = threading.Lock()
         self.handlers = []
 
-    # internal data-handling methods
+    ## internal data-handling methods
     def recv_packet(self, timeout=None):
         t0 = time.time()
-        self.ser.timeout = None
+        #self.ser.timeout = None
         while timeout is None or time.time() < t0 + timeout:
+            timeout = None
             if timeout is not None: self.ser.timeout = t0 + timeout - time.time()
             c = self.ser.read()
             if not c: return None
@@ -128,7 +130,7 @@ class BT(object):
         self.remove_handler(h)
         return res[0]
 
-    # specific BLE commands
+    ## specific BLE commands
     def connect(self, addr):
         return self.send_command(6, 3, pack('6sBHHHH', multichr(addr), 0, 6, 6, 64, 0))
 
@@ -159,10 +161,10 @@ class BT(object):
         while True:
             p = self.recv_packet()
 
-            # no timeout, so p won't be None
+            ## no timeout, so p won't be None
             if p.typ == 0: return p
 
-            # not a response: must be an event
+            ## not a response: must be an event
             self.handle_event(p)
 
 
@@ -194,13 +196,13 @@ class MyoRaw(object):
         self.bt.recv_packet(timeout)
 
     def connect(self):
-        # stop everything from before
+        ## stop everything from before
         self.bt.end_scan()
         self.bt.disconnect(0)
         self.bt.disconnect(1)
         self.bt.disconnect(2)
 
-        # start scanning
+        ## start scanning
         print('scanning...')
         self.bt.discover()
         while True:
@@ -212,12 +214,12 @@ class MyoRaw(object):
                 break
         self.bt.end_scan()
 
-        # connect and wait for status event
+        ## connect and wait for status event
         conn_pkt = self.bt.connect(addr)
         self.conn = multiord(conn_pkt.payload)[-1]
         self.bt.wait_event(3, 0)
 
-        # get firmware version
+        ## get firmware version
         fw = self.read_attr(0x17)
         _, _, _, _, v0, v1, v2, v3 = unpack('BHBBHHHH', fw.payload)
         print('firmware version: %d.%d.%d.%d' % (v0, v1, v2, v3))
@@ -225,47 +227,47 @@ class MyoRaw(object):
         self.old = (v0 == 0)
 
         if self.old:
-            # don't know what these do; Myo Connect sends them, though we get data
-            # fine without them
+            ## don't know what these do; Myo Connect sends them, though we get data
+            ## fine without them
             self.write_attr(0x19, b'\x01\x02\x00\x00')
             self.write_attr(0x2f, b'\x01\x00')
             self.write_attr(0x2c, b'\x01\x00')
             self.write_attr(0x32, b'\x01\x00')
             self.write_attr(0x35, b'\x01\x00')
 
-            # enable EMG data
+            ## enable EMG data
             self.write_attr(0x28, b'\x01\x00')
-            # enable IMU data
+            ## enable IMU data
             self.write_attr(0x1d, b'\x01\x00')
 
-            # Sampling rate of the underlying EMG sensor, capped to 1000. If it's
-            # less than 1000, emg_hz is correct. If it is greater, the actual
-            # framerate starts dropping inversely. Also, if this is much less than
-            # 1000, EMG data becomes slower to respond to changes. In conclusion,
-            # 1000 is probably a good value.
+            ## Sampling rate of the underlying EMG sensor, capped to 1000. If it's
+            ## less than 1000, emg_hz is correct. If it is greater, the actual
+            ## framerate starts dropping inversely. Also, if this is much less than
+            ## 1000, EMG data becomes slower to respond to changes. In conclusion,
+            ## 1000 is probably a good value.
             C = 1000
             emg_hz = 50
-            # strength of low-pass filtering of EMG data
+            ## strength of low-pass filtering of EMG data
             emg_smooth = 100
 
             imu_hz = 50
 
-            # send sensor parameters, or we don't get any data
+            ## send sensor parameters, or we don't get any data
             self.write_attr(0x19, pack('BBBBHBBBBB', 2, 9, 2, 1, C, emg_smooth, C // emg_hz, imu_hz, 0, 0))
 
         else:
             name = self.read_attr(0x03)
             print('device name: %s' % name.payload)
 
-            # enable IMU data
+            ## enable IMU data
             self.write_attr(0x1d, b'\x01\x00')
-            # enable on/off arm notifications
+            ## enable on/off arm notifications
             self.write_attr(0x24, b'\x02\x00')
 
             # self.write_attr(0x19, b'\x01\x03\x00\x01\x01')
             self.start_raw()
 
-        # add data handlers
+        ## add data handlers
         def handle_data(p):
             if (p.cls, p.cmd) != (4, 5): return
 
@@ -274,9 +276,9 @@ class MyoRaw(object):
 
             if attr == 0x27:
                 vals = unpack('8HB', pay)
-                # not entirely sure what the last byte is, but it's a bitmask that
-                # seems to indicate which sensors think they're being moved around or
-                # something
+                ## not entirely sure what the last byte is, but it's a bitmask that
+                ## seems to indicate which sensors think they're being moved around or
+                ## something
                 emg = vals[:8]
                 moving = vals[8]
                 self.on_emg(emg, moving)
@@ -363,7 +365,7 @@ class MyoRaw(object):
 
     def vibrate(self, length):
         if length in xrange(1, 4):
-            # first byte tells it to vibrate; purpose of second byte is unknown
+            ## first byte tells it to vibrate; purpose of second byte is unknown
             self.write_attr(0x19, pack('3B', 3, 1, length))
 
 
@@ -398,21 +400,21 @@ class MyoRaw(object):
 
 
 if __name__ == '__main__':
-    last_vals = None
     m = MyoRaw(sys.argv[1] if len(sys.argv) >= 2 else None)
 
-    currValues = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    currValues = [0, 0, 0, 0, 0, 0, 0, 0]
+    prevValues = copy.deepcopy(currValues)
 
     def proc_emg(emg, moving, times=[]):
         #print("emg: ", emg)
         for i in range(0, 8):
             currValues[i] = emg[i]
-            
-        # print framerate of received data
-        times.append(time.time())
-        if len(times) > 20:
+
+        ## print framerate of received data
+        #times.append(time.time())
+        #if len(times) > 20:
             #print((len(times) - 1) / (times[-1] - times[0]))
-            times.pop(0)
+            #times.pop(0)
 
     '''
     def proc_imu(quat, acc, gyro, times=[]):
@@ -434,11 +436,8 @@ if __name__ == '__main__':
     0 - fist clench
     1 - hand wide open
     2 - finger gun with thumb up
-    3 - rock symbol
-    4 - scissors
-    5 - middle finger
-    6 - thumbs up
-    7 - spock
+    3 - scissors
+    4 - spock
     '''
 
     m.add_emg_handler(proc_emg)
@@ -448,32 +447,39 @@ if __name__ == '__main__':
     m.add_arm_handler(lambda arm, xdir: print('arm', arm, 'xdir', xdir))
     m.add_pose_handler(lambda p: print('pose', p))
 
-    numpyArray = np.array([None, None, None, None, None, None, None, None, None])
+    i = 0
 
     try:
-        curr_socket = socket.socket()
-        port = 1000
-        curr_socket.bind(('127.0.0.1', port))
-        curr_socket.listen(1)
+        #curr_socket = socket.socket()
+        #port = 2000
+        #curr_socket.bind(('127.0.0.1', port))
+        #curr_socket.listen(1)
 
-        try:
-            modelName = 'model.pt';
-            model = torch.load(modelName);
-        except IOError:
-            print('Model file {} does not exist'.format(modelName));
-            exit(2);
+        #model = torch.load("./model.pt")
+        #model.eval()
 
-        start_time = time.time()
         while True:
             m.run(1)
+            model = torch.load("./model.pt")
 
-            if currValues != [0, 0, 0, 0, 0, 0, 0, 0, 0]:
-                print(currValues)
-                
-                # YOUR CODE HERE
+            if currValues != [0, 0, 0, 0, 0, 0, 0, 0, 0] and currValues != prevValues:
+                prevValues = copy.deepcopy(currValues)
+
+                currValues_numpy = np.array(currValues)
+                currValues_numpy = np.expand_dims(currValues_numpy, axis=0) # Temporary to create correct shape
+                currValues_numpy = np.expand_dims(currValues_numpy, axis=2) # Temporary to create correct shape
+
+                currValues_torch = torch.from_numpy(currValues_numpy)
+                predictions = model(currValues_torch.float())
+                index = int(torch.argmax(predictions.squeeze()))
+                print(predictions)
+                print(i, index)
+                i += 1
+                '''
                 c, address = curr_socket.accept()
                 c.sendall(str(currValues).encode("utf-8"))
                 c.close()
+                '''
 
 
     except KeyboardInterrupt:

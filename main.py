@@ -127,12 +127,12 @@ def evaluate(model, Vload):
 #######################################################################################################################
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--batch_size', type=int, default=64)
     #parser.add_argument('--lr', type=float, default= 0.1)
     parser.add_argument('--lr', type=float, default= 0.001)
-    parser.add_argument('--epochs', type=int, default= 16)
-    parser.add_argument('--eval_every', type=int, default=(128 * 2) - 1)
-    parser.add_argument('--training_mode', type=bool, default=False, help='True = training | False = inference')
+    parser.add_argument('--epochs', type=int, default= 10)
+    parser.add_argument('--eval_every', type=int, default=30)
+    parser.add_argument('--training_mode', type=bool, default=True, help='True = training | False = inference')
 
     args = parser.parse_args()
 
@@ -185,6 +185,7 @@ def main():
                 t += 1
 
         print("Max Validation Accuracy: {} | Occurs at: {}".format(curr_max_valid_accuracy, curr_max_index))
+        torch.save(model, "model.pt")
 
     else:
         try:

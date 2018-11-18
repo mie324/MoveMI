@@ -90,6 +90,7 @@ class ConvolutionalNeuralNetwork(nn.Module):
         x = self.conv2(x)
         x = self.pool2(x)
         x = self.random_relu(x)
+
         x = self.conv3(x)
         x = self.pool2(x)
         x = self.random_relu(x)

@@ -12,6 +12,7 @@ from serial.tools.list_ports import comports
 
 import struct
 import numpy as np
+import copy
 
 # Code mostly from https://github.com/dzhu/myo-raw
 # Have to enter "python -m pip install pyserial" in Terminal
@@ -400,18 +401,19 @@ if __name__ == '__main__':
     '''
     0 - fist clench
     1 - hand wide open
+    2 - relaxed
+    
+    
     2 - finger gun with thumb up
-    3 - rock symbol
-    4 - scissors
-    5 - middle finger
-    6 - thumbs up
-    7 - spock
+    3 - scissors
+    4 - spock
     '''
-    label = 5
+    label = 2
 
-    participant = "Jennifer"
+    participant = "Jay2"
 
     currValues = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    prevValues = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     def proc_emg(emg, moving, times=[]):
         #print("emg: ", emg)
@@ -452,9 +454,11 @@ if __name__ == '__main__':
         start_time = time.time()
         while True:
             m.run(1)
+            print(time.time() - start_time)
 
-            if currValues != [0, 0, 0, 0, 0, 0, 0, 0, 0]:
+            if currValues != [0, 0, 0, 0, 0, 0, 0, 0, 0] and currValues != prevValues:
                 #print(currValues)
+                prevValues = copy.deepcopy(currValues)
 
                 currValues[8] = label
 
@@ -465,8 +469,8 @@ if __name__ == '__main__':
 
                 print(currValues)
 
-                if time.time() - start_time > 15:
-                    break
+            if time.time() - start_time > 60:
+                break
 
         print(numpyArray.shape)
 
