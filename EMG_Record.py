@@ -402,15 +402,16 @@ if __name__ == '__main__':
     0 - fist clench
     1 - hand wide open
     2 - relaxed
+    3 - scissors
     
     
     2 - finger gun with thumb up
     3 - scissors
     4 - spock
     '''
-    label = 2
+    label = 3
 
-    participant = "Jay2"
+    participant = "David3"
 
     currValues = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     prevValues = [0, 0, 0, 0, 0, 0, 0, 0, 0]

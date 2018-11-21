@@ -130,7 +130,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=64)
     #parser.add_argument('--lr', type=float, default= 0.1)
     parser.add_argument('--lr', type=float, default= 0.001)
-    parser.add_argument('--epochs', type=int, default= 10)
+    parser.add_argument('--epochs', type=int, default= 7)
     parser.add_argument('--eval_every', type=int, default=30)
     parser.add_argument('--training_mode', type=bool, default=True, help='True = training | False = inference')
 

@@ -404,6 +404,8 @@ if __name__ == '__main__':
 
     currValues = [0, 0, 0, 0, 0, 0, 0, 0]
     prevValues = copy.deepcopy(currValues)
+    accelerometer = [0, 0, 0];
+    gyroscope = [0, 0, 0];
 
     def proc_emg(emg, moving, times=[]):
         #print("emg: ", emg)
@@ -416,21 +418,17 @@ if __name__ == '__main__':
             #print((len(times) - 1) / (times[-1] - times[0]))
             #times.pop(0)
 
-    '''
+
     def proc_imu(quat, acc, gyro, times=[]):
         #print("acc: ", acc)
         #print("gyro: ", gyro)
+        accelerometer = acc
+        gyroscope = gyro
         
-        for i in range(0, 3):
-            currValues[8 + i] = quat[i + 1]
-        for i in range(0, 3):
-            currValues[11 + i] = acc[i]
-            currValues[14 + i] = gyro[i]
-        
-        times.append(time.time())
-        if len(times) > 20:
-            times.pop(0)
-`'''
+        #times.append(time.time())
+        #if len(times) > 20:
+        #    times.pop(0)
+
 
     '''
     0 - fist clench
@@ -447,16 +445,13 @@ if __name__ == '__main__':
     m.add_arm_handler(lambda arm, xdir: print('arm', arm, 'xdir', xdir))
     m.add_pose_handler(lambda p: print('pose', p))
 
-    i = 0
-
     try:
         #curr_socket = socket.socket()
-        #port = 2000
+        port = 2048
         #curr_socket.bind(('127.0.0.1', port))
         #curr_socket.listen(1)
 
-        #model = torch.load("./model.pt")
-        #model.eval()
+        i = 0
 
         while True:
             m.run(1)
@@ -466,20 +461,22 @@ if __name__ == '__main__':
                 prevValues = copy.deepcopy(currValues)
 
                 currValues_numpy = np.array(currValues)
-                currValues_numpy = np.expand_dims(currValues_numpy, axis=0) # Temporary to create correct shape
-                currValues_numpy = np.expand_dims(currValues_numpy, axis=2) # Temporary to create correct shape
+                currValues_numpy = np.expand_dims(currValues_numpy, axis=0)
+                currValues_numpy = np.expand_dims(currValues_numpy, axis=2)
 
                 currValues_torch = torch.from_numpy(currValues_numpy)
                 predictions = model(currValues_torch.float())
                 index = int(torch.argmax(predictions.squeeze()))
-                print(predictions)
                 print(i, index)
+                print(currValues)
                 i += 1
-                '''
-                c, address = curr_socket.accept()
-                c.sendall(str(currValues).encode("utf-8"))
-                c.close()
-                '''
+
+                to_send = str(index) + "/" + str(accelerometer) + "/" + str(gyroscope)
+                to_send = str(i) + "/" + to_send
+
+                #c, address = curr_socket.accept()
+                #c.sendall(str(to_send).encode("utf-8"))
+                #c.close()
 
 
     except KeyboardInterrupt:
