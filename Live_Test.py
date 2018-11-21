@@ -19,6 +19,8 @@ import torch
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
+import Queue;
+
 # Code mostly from https://github.com/dzhu/myo-raw
 # Have to enter "python -m pip install pyserial" in Terminal
 # If there is an error saying there must be at a buffer, just restart
@@ -407,6 +409,9 @@ if __name__ == '__main__':
     accelerometer = [0, 0, 0];
     gyroscope = [0, 0, 0];
 
+    windowSize = 10; #adjust this to change the queue length
+    queue = Queue.Queue(8, windowSize);
+
     def proc_emg(emg, moving, times=[]):
         #print("emg: ", emg)
         for i in range(0, 8):
@@ -457,26 +462,21 @@ if __name__ == '__main__':
             m.run(1)
             model = torch.load("./model.pt")
 
-            if currValues != [0, 0, 0, 0, 0, 0, 0, 0, 0] and currValues != prevValues:
-                prevValues = copy.deepcopy(currValues)
+            currValuesnp = np.array(currValues);
+            queue.update(currValuesnp);
 
-                currValues_numpy = np.array(currValues)
-                currValues_numpy = np.expand_dims(currValues_numpy, axis=0)
-                currValues_numpy = np.expand_dims(currValues_numpy, axis=2)
+            temp = torch.from_numpy(np.expand_dims(np.expand_dims(queue.mean, axis=0), axis=2));
+            predict = int(torch.argmax(model(temp.float()).squeeze()));
 
-                currValues_torch = torch.from_numpy(currValues_numpy)
-                predictions = model(currValues_torch.float())
-                index = int(torch.argmax(predictions.squeeze()))
-                print(i, index)
-                print(currValues)
-                i += 1
+            print(i, predict, currValues);
+            i +=1
 
-                to_send = str(index) + "/" + str(accelerometer) + "/" + str(gyroscope)
-                to_send = str(i) + "/" + to_send
+            to_send = str(index) + "/" + str(accelerometer) + "/" + str(gyroscope)
+            to_send = str(i) + "/" + to_send
 
-                #c, address = curr_socket.accept()
-                #c.sendall(str(to_send).encode("utf-8"))
-                #c.close()
+            #c, address = curr_socket.accept()
+            #c.sendall(str(to_send).encode("utf-8"))
+            #c.close()
 
 
     except KeyboardInterrupt:
