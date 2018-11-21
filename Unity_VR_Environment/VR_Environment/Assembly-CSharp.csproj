@@ -10,7 +10,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <RootNamespace>
     </RootNamespace>
-    <ProjectGuid>{E91A57D9-81EB-E524-19A0-C9E0F140DD47}</ProjectGuid>
+    <ProjectGuid>{1EF2A9AC-25D0-FC60-E087-E0C33AF0FA1C}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <AssemblyName>Assembly-CSharp</AssemblyName>
@@ -61,18 +61,18 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\TCP_Server.cs" />
+    <Compile Include="Assets\Hand_Manipulate.cs" />
     <Reference Include="UnityEditor.StandardEvents">
-      <HintPath>C:/Users/jy476/Documents/University/Third Year/First Term/Introduction to Machine Intelligence/Project/Demo2/Library/ScriptAssemblies/UnityEditor.StandardEvents.dll</HintPath>
+      <HintPath>C:/Users/jy476/Documents/University/Third Year/First Term/Introduction to Machine Intelligence/Project/VR_Environment/Library/ScriptAssemblies/UnityEditor.StandardEvents.dll</HintPath>
     </Reference>
     <Reference Include="Unity.TextMeshPro.Editor">
-      <HintPath>C:/Users/jy476/Documents/University/Third Year/First Term/Introduction to Machine Intelligence/Project/Demo2/Library/ScriptAssemblies/Unity.TextMeshPro.Editor.dll</HintPath>
+      <HintPath>C:/Users/jy476/Documents/University/Third Year/First Term/Introduction to Machine Intelligence/Project/VR_Environment/Library/ScriptAssemblies/Unity.TextMeshPro.Editor.dll</HintPath>
     </Reference>
     <Reference Include="Unity.PackageManagerUI.Editor">
-      <HintPath>C:/Users/jy476/Documents/University/Third Year/First Term/Introduction to Machine Intelligence/Project/Demo2/Library/ScriptAssemblies/Unity.PackageManagerUI.Editor.dll</HintPath>
+      <HintPath>C:/Users/jy476/Documents/University/Third Year/First Term/Introduction to Machine Intelligence/Project/VR_Environment/Library/ScriptAssemblies/Unity.PackageManagerUI.Editor.dll</HintPath>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
-      <HintPath>C:/Users/jy476/Documents/University/Third Year/First Term/Introduction to Machine Intelligence/Project/Demo2/Library/ScriptAssemblies/Unity.TextMeshPro.dll</HintPath>
+      <HintPath>C:/Users/jy476/Documents/University/Third Year/First Term/Introduction to Machine Intelligence/Project/VR_Environment/Library/ScriptAssemblies/Unity.TextMeshPro.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.AIModule">
       <HintPath>C:/Program Files/Unity/Editor/Data/Managed/UnityEngine/UnityEngine.AIModule.dll</HintPath>

@@ -451,10 +451,9 @@ if __name__ == '__main__':
     m.add_pose_handler(lambda p: print('pose', p))
 
     try:
-        #curr_socket = socket.socket()
+        curr_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        address = '127.0.0.1'
         port = 2048
-        #curr_socket.bind(('127.0.0.1', port))
-        #curr_socket.listen(1)
 
         i = 0
 
@@ -466,17 +465,16 @@ if __name__ == '__main__':
             queue.update(currValuesnp);
 
             temp = torch.from_numpy(np.expand_dims(np.expand_dims(queue.mean, axis=0), axis=2));
+            #temp = torch.from_numpy(np.expand_dims(np.expand_dims(currValuesnp, axis=0), axis=2));
             predict = int(torch.argmax(model(temp.float()).squeeze()));
 
             print(i, predict, currValues);
             i +=1
 
-            to_send = str(index) + "/" + str(accelerometer) + "/" + str(gyroscope)
+            to_send = str(predict) + "/" + str(accelerometer) + "/" + str(gyroscope)
             to_send = str(i) + "/" + to_send
 
-            #c, address = curr_socket.accept()
-            #c.sendall(str(to_send).encode("utf-8"))
-            #c.close()
+            curr_socket.sendto(bytes(to_send, "utf-8"), (address, port))
 
 
     except KeyboardInterrupt:
