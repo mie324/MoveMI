@@ -427,9 +427,11 @@ if __name__ == '__main__':
     def proc_imu(quat, acc, gyro, times=[]):
         #print("acc: ", acc)
         #print("gyro: ", gyro)
-        accelerometer = acc
-        gyroscope = gyro
-        
+
+        for i in range(0, 3):
+            accelerometer[i] = acc[i]
+            gyroscope[i] = gyro[i]
+
         #times.append(time.time())
         #if len(times) > 20:
         #    times.pop(0)
@@ -444,7 +446,7 @@ if __name__ == '__main__':
     '''
 
     m.add_emg_handler(proc_emg)
-    #m.add_imu_handler(proc_imu)
+    m.add_imu_handler(proc_imu)
     m.connect()
 
     m.add_arm_handler(lambda arm, xdir: print('arm', arm, 'xdir', xdir))
@@ -456,6 +458,8 @@ if __name__ == '__main__':
         port = 2048
 
         i = 0
+
+        interval_time = time.time();
 
         while True:
             m.run(1)
@@ -471,10 +475,13 @@ if __name__ == '__main__':
             print(i, predict, currValues);
             i +=1
 
-            to_send = str(predict) + "/" + str(accelerometer) + "/" + str(gyroscope)
-            to_send = str(i) + "/" + to_send
+            if time.time() - interval_time >= 0.1:
+                to_send = str(predict) + "/" + str(accelerometer) + "/" + str(gyroscope)
+                to_send = str(i) + "/" + to_send
 
-            curr_socket.sendto(bytes(to_send, "utf-8"), (address, port))
+                curr_socket.sendto(bytes(to_send, "utf-8"), (address, port))
+
+                start_time = time.time()
 
 
     except KeyboardInterrupt:

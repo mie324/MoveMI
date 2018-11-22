@@ -44,7 +44,6 @@ public class Hand_Manipulate : MonoBehaviour {
 
     public void UDP_receive()
     {
-
         byte[] received_bytes = client.Receive(ref IP_end_point);
         string message_received = System.Text.Encoding.ASCII.GetString(received_bytes);
 
