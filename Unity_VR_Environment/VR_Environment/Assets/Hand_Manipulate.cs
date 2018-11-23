@@ -24,6 +24,22 @@ public class Hand_Manipulate : MonoBehaviour {
     float[,,] finger_values = new float[5, 3, 4]
     {
         {
+            {254f, 237.6f, 238.6f, 238.6f}, {258.5f, 275.5f, 238.6f, 238.6f}, {245.6f, 226.2f, 194.7f, 238.6f} // Updated
+        },
+        {
+            {345f, 323.5f, 316.7f, 316.7f}, {3.7f, 350.2f, 330.7f, 316.7f}, {269.4f, 270.3f, 252.7f, 316.7f} // Updated
+        },
+        {
+            {351.1f, 323.9f, 316.3f, 316.3f}, {1.2f, 346.1f, 327.4f, 316.3f}, {289.7f, 279.4f, 235.2f, 316.3f} // Updated
+        },
+        {
+            {350.1f, 326.7f, 317.1f, 317.1f}, {2.8f, 340.5f, 329.1f, 317.1f}, {297.9f, 270.6f, 246.5f, 317.1f} // Updated
+        },
+        {
+            {179.9f, 345.5f, 326.6f, 321.2f}, {186.5f, 351.6f, 341.6f, 333.3f}, {166.1f, 317.6f, 239.1f, 274.9f} // Updated
+        }
+        /*_________________________________________________________________
+        {
             {27.229f, -16.368f, 0.9990001f, 0}, {31.7f, 21.5f, 0.9990001f, 0}, {18.8f, -27.8f, -42.96f, 0}
         },
         {
@@ -37,13 +53,14 @@ public class Hand_Manipulate : MonoBehaviour {
         },
         {
             {1, 1, 1, 1}, {29.5f, 172.6f, -3.98f, 6.72f}, {9.1f, 138.6f, -106.4f, -51.7f}
-        }
+        }*/
     };
 
     int[] curr_finger_positions = new int[5] { 0, 0, 0, 0, 0 };
 
     public void UDP_receive()
     {
+
         byte[] received_bytes = client.Receive(ref IP_end_point);
         string message_received = System.Text.Encoding.ASCII.GetString(received_bytes);
 
@@ -75,8 +92,16 @@ public class Hand_Manipulate : MonoBehaviour {
                 start_time = Time.time;
                 for (int i = 0; i < 4; i++)
                 {
-                    angles[i] = finger_values[finger, action, i] - curr_finger.transform.localRotation.z;
-                    if (i < 3) curr_finger = curr_finger.transform.GetChild(0).gameObject;
+                    if (finger == 0)
+                    {
+                        angles[i] = finger_values[finger, action, i] - curr_finger.transform.eulerAngles.z;
+                        if (i < 3) curr_finger = curr_finger.transform.GetChild(0).gameObject;
+                    } else
+                    {
+                        angles[i] = finger_values[finger, action, i] - curr_finger.transform.eulerAngles.z;
+                        if (angles[i] < 0 && action == 1) angles[i] += 360;
+                        if (i < 3) curr_finger = curr_finger.transform.GetChild(0).gameObject;
+                    }
                 }
             }
         } else
@@ -100,18 +125,15 @@ public class Hand_Manipulate : MonoBehaviour {
 
 	// Use this for initialization
 	void Start () {
-        moving = false;
+        /*moving = false;
         client = new UdpClient(port);
         IP_end_point = new IPEndPoint(IPAddress.Parse(IP_address), 0);
-        UDP_receive();
+        UDP_receive();*/
     }
 	
 	// Update is called once per frame
 	void Update () {
         UDP_receive();
-        /*fingerMove(1, 1);
-        GameObject curr_finger = hand.transform.GetChild(0 + 2).gameObject;
-        Debug.Log(curr_finger.name);
-        Debug.Log(curr_finger.transform.eulerAngles.z);*/
+        //fingerMove(4, 1);
     }
 }
