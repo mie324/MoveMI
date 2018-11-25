@@ -125,8 +125,8 @@ public class Hand_Manipulate : MonoBehaviour {
                 GameObject curr_finger = hand.transform.GetChild(finger + 2).gameObject;
                 for (int i = 0; i < 4; i++)
                 {
-			curr_finger.transform.localEulerAngles = Vector3.Lerp(curr_finger.transform.localEulerAngles, new Vector3(curr_finger.transform.localEulerAngles.x, curr_finger.transform.localEulerAngles.y, angles[i]), Time.deltaTime);
-			if (i < 3) curr_finger = curr_finger.transform.GetChild(0).gameObject;
+			        curr_finger.transform.localEulerAngles = Vector3.Lerp(curr_finger.transform.localEulerAngles, new Vector3(curr_finger.transform.localEulerAngles.x, curr_finger.transform.localEulerAngles.y, angles[i]), Time.deltaTime);
+			        if (i < 3) curr_finger = curr_finger.transform.GetChild(0).gameObject;
                 }
             }
             else
