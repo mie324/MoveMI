@@ -4,13 +4,10 @@
 
 import argparse
 import numpy;
-import matplotlib.pyplot as mpl;
-import pandas;
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder;
 from sklearn.model_selection import train_test_split;
 
 import torch;
-from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
 from dataset import signalDataset;
@@ -27,11 +24,9 @@ trainAcc = [];
 valAcc = [];
 epochTrack = [];
 
-###
 filename = '' + '.npy';
 
-def recieveData():
-    #raw = numpy.loadtxt("LabelledData.csv", delimiter=",");
+def receiveData():
     raw = numpy.array([])
 
     for data_csv in os.listdir("./data"):
@@ -57,18 +52,8 @@ def modifyData(rawV, rawL):
     oneHotLabels = ohe.fit_transform(oneHotLabels.reshape(-1,1)).toarray();
     Ndata = normalized.transpose((0,2,1));
     '''
-    #for i in range(0, rawV.shape[1]):
-    #    mean = numpy.sum(rawV[:, i])
-    #    mean /= rawV.shape[1]
-    #    std = 0
-    #    for j in range(0, rawV.shape[0]):
-    #        std += (rawV[j, i] - mean) ** 2
-    #    std / rawV.shape[1]
-    #    std = std ** (1/2)
-    #    for j in range(0, rawV.shape[0]):
-    #        rawV[j, i] = (rawV[j, i] - mean) / std
 
-    rawV = numpy.expand_dims(rawV, axis=0) # Temporary to create correct shape
+    rawV = numpy.expand_dims(rawV, axis=0) # Used to create correct shape
     rawV = rawV.transpose((1, 2, 0))
 
     label_encoder = LabelEncoder()
@@ -136,7 +121,7 @@ def main():
 
     args = parser.parse_args()
 
-    rawV, rawL = recieveData()
+    rawV, rawL = receiveData()
     modV, modL = modifyData(rawV, rawL);
 
 

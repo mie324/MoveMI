@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.44657898, g: 0.4964133, b: 0.5748178, a: 1}
+  m_IndirectSpecularColor: {r: 0.4465785, g: 0.49641252, b: 0.574817, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -188,7 +188,7 @@ Prefab:
     m_Modifications:
     - target: {fileID: 400054, guid: 9d763815c4fe19b41978415ea5471318, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.15
+      value: 0.05
       objectReference: {fileID: 0}
     - target: {fileID: 400054, guid: 9d763815c4fe19b41978415ea5471318, type: 3}
       propertyPath: m_LocalPosition.y
@@ -196,15 +196,15 @@ Prefab:
       objectReference: {fileID: 0}
     - target: {fileID: 400054, guid: 9d763815c4fe19b41978415ea5471318, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.4
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 400054, guid: 9d763815c4fe19b41978415ea5471318, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 400054, guid: 9d763815c4fe19b41978415ea5471318, type: 3}
       propertyPath: m_LocalRotation.y
-      value: -0.23853342
+      value: -0.71630186
       objectReference: {fileID: 0}
     - target: {fileID: 400054, guid: 9d763815c4fe19b41978415ea5471318, type: 3}
       propertyPath: m_LocalRotation.z
@@ -212,7 +212,7 @@ Prefab:
       objectReference: {fileID: 0}
     - target: {fileID: 400054, guid: 9d763815c4fe19b41978415ea5471318, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.9711343
+      value: -0.6977905
       objectReference: {fileID: 0}
     - target: {fileID: 400054, guid: 9d763815c4fe19b41978415ea5471318, type: 3}
       propertyPath: m_RootOrder
@@ -236,7 +236,7 @@ Prefab:
       objectReference: {fileID: 0}
     - target: {fileID: 400054, guid: 9d763815c4fe19b41978415ea5471318, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: -27.6
+      value: -268.5
       objectReference: {fileID: 0}
     - target: {fileID: 400014, guid: 9d763815c4fe19b41978415ea5471318, type: 3}
       propertyPath: m_RootOrder

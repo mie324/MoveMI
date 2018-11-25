@@ -11,6 +11,6 @@ public class Show_Euler_Angles : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-        Debug.Log(this.gameObject.transform.eulerAngles);
+        Debug.Log(this.gameObject.transform.localEulerAngles);
 	}
 }
