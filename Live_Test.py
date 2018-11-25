@@ -17,6 +17,8 @@ import torch
 
 import Queue;
 
+import sys
+
 # Code mostly from https://github.com/dzhu/myo-raw
 # Have to enter "python -m pip install pyserial" in Terminal
 # If there is an error saying there must be at a buffer, just restart
@@ -42,26 +44,6 @@ def multiord(b):
         return list(b)
     else:
         return map(ord, b)
-
-class Arm(enum.Enum):
-    UNKNOWN = 0
-    RIGHT = 1
-    LEFT = 2
-
-class XDirection(enum.Enum):
-    UNKNOWN = 0
-    X_TOWARD_WRIST = 1
-    X_TOWARD_ELBOW = 2
-
-class Pose(enum.Enum):
-    REST = 0
-    FIST = 1
-    WAVE_IN = 2
-    WAVE_OUT = 3
-    FINGERS_SPREAD = 4
-    THUMB_TO_PINKY = 5
-    UNKNOWN = 255
-
 
 class Packet(object):
     def __init__(self, ords):
@@ -199,8 +181,9 @@ class MyoRaw(object):
         self.conn = None
         self.emg_handlers = []
         self.imu_handlers = []
-        self.arm_handlers = []
-        self.pose_handlers = []
+
+        # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
+        self.battery_handlers = []
 
     def detect_tty(self):
         for p in comports():
@@ -242,16 +225,18 @@ class MyoRaw(object):
         _, _, _, _, v0, v1, v2, v3 = unpack('BHBBHHHH', fw.payload)
         print('firmware version: %d.%d.%d.%d' % (v0, v1, v2, v3))
 
-        name = self.read_attr(0x03)
-        print('device name: %s' % name.payload)
+        #name = self.read_attr(0x03)
+        #print('device name: %s' % name.payload)
 
         ## enable IMU data
         self.write_attr(0x1d, b'\x01\x00')
         ## enable on/off arm notifications
         self.write_attr(0x24, b'\x02\x00')
 
-        # self.write_attr(0x19, b'\x01\x03\x00\x01\x01')
         self.start_raw()
+
+        # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
+        self.write_attr(0x12, b'\x01\x10')
 
         ## add data handlers
         def handle_data(p):
@@ -274,6 +259,11 @@ class MyoRaw(object):
                 acc = vals[4:7]
                 gyro = vals[7:10]
                 self.on_imu(quat, acc, gyro)
+            elif attr == 0x11:
+                # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
+                # For battery
+                battery_level = ord(pay)
+                self.on_battery(battery_level)
 
         self.bt.add_handler(handle_data)
 
@@ -281,6 +271,10 @@ class MyoRaw(object):
     def write_attr(self, attr, val):
         if self.conn is not None:
             self.bt.write_attr(self.conn, attr, val)
+
+    def disconnect(self):
+        if self.conn is not None:
+            self.bt.disconnect(self.conn)
 
     def read_attr(self, attr):
         if self.conn is not None:
@@ -310,6 +304,21 @@ class MyoRaw(object):
         for h in self.imu_handlers:
             h(quat, acc, gyro)
 
+    # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
+    def sleep_mode(self, mode):
+        # Added to prevent Myo from sleeping.
+        # mode = 0 enables sleep mode, mode = 1 disables sleep mode
+        self.write_attr(0x19, pack('3B', 9, 1, mode))
+
+    def add_battery_handler(self, h):
+        self.battery_handlers.append(h)
+
+    def on_battery(self, battery_level):
+        for h in self.battery_handlers:
+            h(battery_level)
+    ########
+
+
 if __name__ == '__main__':
     m = MyoRaw(sys.argv[1] if len(sys.argv) >= 2 else None)
 
@@ -318,7 +327,7 @@ if __name__ == '__main__':
     gyroscope = [0, 0, 0];
     v0 = [0, 0, 0]
     distances = [0, 0, 0]
-    time_interval = 0.1
+    time_interval = 0.5
 
     windowSize = 10; #adjust this to change the queue length
     queue = Queue.Queue(8, windowSize);
@@ -335,6 +344,9 @@ if __name__ == '__main__':
             accelerometer[i] = acc[i]
             gyroscope[i] = gyro[i]
 
+    def proc_battery(battery_level):
+        # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
+        print("Battery Level: %d" % battery_level)
 
     '''
     0 - fist clench
@@ -346,7 +358,9 @@ if __name__ == '__main__':
 
     m.add_emg_handler(proc_emg)
     m.add_imu_handler(proc_imu)
+    m.add_battery_handler(proc_battery) # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
     m.connect()
+    m.sleep_mode(1) # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
 
     curr_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     curr_socket.setblocking(0)
@@ -356,24 +370,33 @@ if __name__ == '__main__':
     interval_time = time.time();
     model = torch.load("./model.pt")
 
-    while True:
-        m.run(1)
+    j = 0
 
-        currValuesnp = np.array(currValues);
-        queue.update(currValuesnp);
+    try:
+        while True:
+            m.run(1)
 
-        temp = torch.from_numpy(np.expand_dims(np.expand_dims(queue.mean, axis=0), axis=2));
-        #temp = torch.from_numpy(np.expand_dims(np.expand_dims(currValuesnp, axis=0), axis=2));
-        predict = int(torch.argmax(model(temp.float()).squeeze()));
+            currValuesnp = np.array(currValues);
+            queue.update(currValuesnp);
 
-        if time.time() - interval_time >= time_interval:
-            for i in range(0, 3):
-                distances[i] = (v0[i] * time_interval) + (0.5 * time_interval * time_interval * accelerometer[i])
-                v0[i] += accelerometer[i] * time_interval
+            temp = torch.from_numpy(np.expand_dims(np.expand_dims(queue.mean, axis=0), axis=2));
+            predict = int(torch.argmax(model(temp.float()).squeeze()));
 
-            to_send = str(predict) + "/" + str(distances[0]) + "/" + str(distances[1]) + "/" + str(distances[2]) + "/" + str(gyroscope[0]) + "/" + str(gyroscope[1]) + "/" + str(gyroscope[2])
-            print(to_send)
+            if time.time() - interval_time >= time_interval:
+                for i in range(0, 3):
+                    distances[i] = (v0[i] * time_interval) + (0.5 * time_interval * time_interval * accelerometer[i])
+                    v0[i] += accelerometer[i] * time_interval
 
-            curr_socket.sendto(bytes(to_send, "utf-8"), (address, port))
+                to_send = str(predict) + "/" + str(distances[0]) + "/" + str(distances[1]) + "/" + str(distances[2]) + "/" + str(gyroscope[0]) + "/" + str(gyroscope[1]) + "/" + str(gyroscope[2])
+                to_send = str(j) + "/" + to_send
+                print(to_send)
+                j += 1
 
-            start_time = time.time()
+                curr_socket.sendto(bytes(to_send, "utf-8"), (address, port)) # Sending data up to 100 bytes in size approximately
+
+                start_time = time.time()
+
+    except KeyboardInterrupt:
+        pass
+    finally:
+        m.disconnect()
