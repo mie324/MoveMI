@@ -18,6 +18,7 @@ import torch
 import Queue;
 
 import sys
+import copy
 
 # Code mostly from https://github.com/dzhu/myo-raw
 # Have to enter "python -m pip install pyserial" in Terminal
@@ -316,6 +317,9 @@ class MyoRaw(object):
     def on_battery(self, battery_level):
         for h in self.battery_handlers:
             h(battery_level)
+
+    def set_leds(self, logo, line):
+        self.write_attr(0x19, pack('8B', 6, 6, *(logo + line)))
     ########
 
 
@@ -325,9 +329,10 @@ if __name__ == '__main__':
     currValues = [0, 0, 0, 0, 0, 0, 0, 0]
     accelerometer = [0, 0, 0];
     gyroscope = [0, 0, 0];
-    v0 = [0, 0, 0]
     distances = [0, 0, 0]
     time_interval = 0.5
+    start_acceleration = [0, 0, 0]
+    first = True
 
     windowSize = 10; #adjust this to change the queue length
     queue = Queue.Queue(8, windowSize);
@@ -341,12 +346,19 @@ if __name__ == '__main__':
     def proc_imu(quat, acc, gyro, times=[]):
 
         for i in range(0, 3):
-            accelerometer[i] = acc[i]
+            accelerometer[i] = acc[i] / 100
             gyroscope[i] = gyro[i]
 
     def proc_battery(battery_level):
         # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
-        print("Battery Level: %d" % battery_level)
+        #print("Battery Level: %d" % battery_level)
+        if battery_level < 5:
+            m.set_leds([255, 0, 0], [255, 0, 0])
+        elif battery_level < 50 and battery_level >= 5:
+            m.set_leds([255, 80, 127], [255, 80, 127])
+        else:
+            #m.set_leds([128, 128, 255], [128, 128, 255]))
+            m.set_leds([0, 255, 0], [0, 255, 0])
 
     '''
     0 - fist clench
@@ -370,8 +382,6 @@ if __name__ == '__main__':
     interval_time = time.time();
     model = torch.load("./model.pt")
 
-    j = 0
-
     try:
         while True:
             m.run(1)
@@ -383,14 +393,26 @@ if __name__ == '__main__':
             predict = int(torch.argmax(model(temp.float()).squeeze()));
 
             if time.time() - interval_time >= time_interval:
-                for i in range(0, 3):
-                    distances[i] = (v0[i] * time_interval) + (0.5 * time_interval * time_interval * accelerometer[i])
-                    v0[i] += accelerometer[i] * time_interval
+                if first:
+                    start_acceleration = copy.deepcopy(accelerometer)
+                    first = False
 
-                to_send = str(predict) + "/" + str(distances[0]) + "/" + str(distances[1]) + "/" + str(distances[2]) + "/" + str(gyroscope[0]) + "/" + str(gyroscope[1]) + "/" + str(gyroscope[2])
-                to_send = str(j) + "/" + to_send
+                for i in range(0, 3):
+                    distances[i] = 0.5 * time_interval * time_interval * (accelerometer[i] - start_acceleration[i])
+                    if(abs(distances[i]) < 0.1): distances[i] = 0
+
+                    gyroscope[i] *= time_interval
+                    if(abs(gyroscope[i]) < 20): gyroscope[i] = 0
+                    gyroscope[i] *= 2.5
+                    gyroscope[i] /= 1000
+
+                distances[0] *= -1
+                distances[2] *= -1
+
+                to_send = str(predict) + "/" + str("{0:.5f}".format(distances[0])) + "/" + str("{0:.5f}".format(distances[1])) + "/" + str("{0:.5f}".format(distances[2])) \
+                          + "/" + str(gyroscope[0]) + "/" + str(gyroscope[1]) + "/" + str(gyroscope[2])
+                #to_send = str(predict) + "/" + str(accelerometer[0]) + "/" + str(accelerometer[1]) + "/" + str(accelerometer[2]) + "/" + str(gyroscope[0]) + "/" + str(gyroscope[1]) + "/" + str(gyroscope[2])
                 print(to_send)
-                j += 1
 
                 curr_socket.sendto(bytes(to_send, "utf-8"), (address, port)) # Sending data up to 100 bytes in size approximately
 
@@ -399,4 +421,5 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         pass
     finally:
+        m.sleep_mode(0)
         m.disconnect()
