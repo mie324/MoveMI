@@ -906,11 +906,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   hand: {fileID: 367301979}
-  rotationSpeed: 10000
-  counter: 200
+  rotationSpeed: 5
   gesture: 0
   rotationF: 0000000000000000000000000000000000000000
-  globalTime: 0
 --- !u!1 &496067371 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 100036, guid: 9d763815c4fe19b41978415ea5471318,
