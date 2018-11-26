@@ -74,9 +74,6 @@ class ConvolutionalNeuralNetwork(nn.Module):
         self.lin2 = nn.Linear(int((576) * ((2 / 3) ** 3)), int((576) * ((2 / 3) ** 6)))
         self.lin3 = nn.Linear(int((576) * ((2 / 3) ** 6)), output_size)
 
-        self.pool1 = nn.MaxPool1d(1, stride=1)
-        self.pool2 = nn.MaxPool1d(1, stride=1)
-
         self.random_relu = nn.RReLU()
         self.softmax = nn.Softmax(dim=1)
 
@@ -84,22 +81,19 @@ class ConvolutionalNeuralNetwork(nn.Module):
     def forward(self, instances):
         pass
         # Convolutional:
+
         x = self.conv1(instances)
-        x = self.pool1(x)
         x = self.random_relu(x)
         x = self.conv2(x)
-        x = self.pool2(x)
         x = self.random_relu(x)
 
         x = self.conv3(x)
-        x = self.pool2(x)
         x = self.random_relu(x)
         x = self.conv4(x)
-        x = self.pool2(x)
         x = self.random_relu(x)
 
         # Linear:
-        x = x.view(-1, 576)
+        x = x.view(-1, 576) # 576
         x = self.lin1(x)
         x = self.random_relu(x)
         x = self.lin2(x)

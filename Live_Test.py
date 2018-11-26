@@ -19,6 +19,7 @@ import Queue;
 
 import sys
 import copy
+import math
 
 # Code mostly from https://github.com/dzhu/myo-raw
 # Have to enter "python -m pip install pyserial" in Terminal
@@ -336,6 +337,7 @@ if __name__ == '__main__':
 
     windowSize = 10; #adjust this to change the queue length
     queue = Queue.Queue(8, windowSize);
+    predictions_queue = Queue.Queue(8, 75)
 
     def proc_emg(emg, moving, times=[]):
         #print("emg: ", emg)
@@ -391,6 +393,7 @@ if __name__ == '__main__':
 
             temp = torch.from_numpy(np.expand_dims(np.expand_dims(queue.mean, axis=0), axis=2));
             predict = int(torch.argmax(model(temp.float()).squeeze()));
+            predictions_queue.update(predict)
 
             if time.time() - interval_time >= time_interval:
                 if first:
@@ -398,6 +401,7 @@ if __name__ == '__main__':
                     first = False
 
                 for i in range(0, 3):
+                    accelerometer
                     distances[i] = 0.5 * time_interval * time_interval * (accelerometer[i] - start_acceleration[i])
                     if(abs(distances[i]) < 0.1): distances[i] = 0
 
@@ -406,12 +410,23 @@ if __name__ == '__main__':
                     gyroscope[i] *= 2.5
                     gyroscope[i] /= 1000
 
-                distances[0] *= -1
-                distances[2] *= -1
+                #distances[0] *= -1
+                #distances[2] *= -1
 
-                to_send = str(predict) + "/" + str("{0:.5f}".format(distances[0])) + "/" + str("{0:.5f}".format(distances[1])) + "/" + str("{0:.5f}".format(distances[2])) \
+                '''
+                # Creating rotation matrix to rotate start_acceleration vector to remove gravity:
+                # https://en.wikipedia.org/wiki/Rotation_matrix
+                Rz = np.array([[math.cos(gyroscope[2] * math.pi / 180), -1 * math.sin(gyroscope[2] * math.pi / 180), 0], [math.sin(gyroscope[2] * math.pi / 180), math.cos(gyroscope[2] * math.pi / 180), 0], [0, 0, 1]])
+                Ry = np.array([[math.cos(gyroscope[1] * math.pi / 180), 0, math.sin(gyroscope[1] * math.pi / 180)], [0, 1, 0], [-1 * math.sin(gyroscope[1] * math.pi / 180), 0, math.cos(gyroscope[1] * math.pi / 180)]])
+                Rx = np.array([[1, 0, 0], [0, math.cos(gyroscope[0] * math.pi / 180), -1 * math.sin(gyroscope[0] * math.pi / 180)], [0, math.sin(gyroscope[0] * math.pi / 180), math.cos(gyroscope[0] * math.pi / 180)]])
+                R = np.dot(Rz, Ry)
+                R = np.dot(R, Rx)
+
+                start_acceleration = np.dot(R, start_acceleration)
+                '''
+
+                to_send = str(predictions_queue.mode) + "/" + str("{0:.5f}".format(distances[0])) + "/" + str("{0:.5f}".format(distances[1])) + "/" + str("{0:.5f}".format(distances[2])) \
                           + "/" + str(gyroscope[0]) + "/" + str(gyroscope[1]) + "/" + str(gyroscope[2])
-                #to_send = str(predict) + "/" + str(accelerometer[0]) + "/" + str(accelerometer[1]) + "/" + str(accelerometer[2]) + "/" + str(gyroscope[0]) + "/" + str(gyroscope[1]) + "/" + str(gyroscope[2])
                 print(to_send)
 
                 curr_socket.sendto(bytes(to_send, "utf-8"), (address, port)) # Sending data up to 100 bytes in size approximately

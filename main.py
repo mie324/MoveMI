@@ -115,8 +115,8 @@ def main():
     parser.add_argument('--batch_size', type=int, default=64)
     #parser.add_argument('--lr', type=float, default= 0.1)
     parser.add_argument('--lr', type=float, default= 0.001)
-    parser.add_argument('--epochs', type=int, default= 7)
-    parser.add_argument('--eval_every', type=int, default=30)
+    parser.add_argument('--epochs', type=int, default= 100)
+    parser.add_argument('--eval_every', type=int, default=1024)
     parser.add_argument('--training_mode', type=bool, default=True, help='True = training | False = inference')
 
     args = parser.parse_args()
@@ -164,13 +164,16 @@ def main():
                     if(valid_accuracy > curr_max_valid_accuracy):
                         curr_max_valid_accuracy = valid_accuracy
                         curr_max_index = t
+                        torch.save(model, 'model.pt')
 
                     accumulated_loss = 0
 
                 t += 1
 
         print("Max Validation Accuracy: {} | Occurs at: {}".format(curr_max_valid_accuracy, curr_max_index))
-        torch.save(model, "model.pt")
+        train_loader, val_loader = loadSplitData(modV, modL, args.batch_size)
+        if(evaluate(model, val_loader) > curr_max_valid_accuracy):
+            torch.save(model, "model.pt")
 
     else:
         try:

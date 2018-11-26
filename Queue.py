@@ -1,4 +1,5 @@
 import numpy as np;
+from scipy import stats
 
 class Queue():
     def __init__(self, queueWidth, queueLength):
@@ -12,3 +13,5 @@ class Queue():
         self.last = (self.last + 1)% self.size;
         self.queue[self.last] = input;
         self.mean = np.mean(self.queue, 0, int);
+        #self.mode = stats.mode(self.queue)
+        self.mode = stats.mode(self.queue[:, 0])[0][0]

@@ -2,7 +2,6 @@ from __future__ import print_function
 
 import enum
 import re
-import struct
 import sys
 import threading
 import time
@@ -12,6 +11,13 @@ from serial.tools.list_ports import comports
 
 import struct
 import numpy as np
+
+import socket
+import torch
+
+import Queue;
+
+import sys
 import copy
 
 # Code mostly from https://github.com/dzhu/myo-raw
@@ -26,6 +32,7 @@ def unpack(fmt, *args):
 
 def text(scr, font, txt, pos, clr=(255,255,255)):
     scr.blit(font.render(txt, True, clr), pos)
+
 
 def multichr(ords):
     if sys.version_info[0] >= 3:
@@ -48,8 +55,8 @@ class Packet(object):
 
     def __repr__(self):
         return 'Packet(%02X, %02X, %02X, [%s])' % \
-            (self.typ, self.cls, self.cmd,
-             ' '.join('%02X' % b for b in multiord(self.payload)))
+               (self.typ, self.cls, self.cmd,
+                ' '.join('%02X' % b for b in multiord(self.payload)))
 
 
 class BT(object):
@@ -175,8 +182,9 @@ class MyoRaw(object):
         self.conn = None
         self.emg_handlers = []
         self.imu_handlers = []
-        self.arm_handlers = []
-        self.pose_handlers = []
+
+        # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
+        self.battery_handlers = []
 
     def detect_tty(self):
         for p in comports():
@@ -218,48 +226,18 @@ class MyoRaw(object):
         _, _, _, _, v0, v1, v2, v3 = unpack('BHBBHHHH', fw.payload)
         print('firmware version: %d.%d.%d.%d' % (v0, v1, v2, v3))
 
-        self.old = (v0 == 0)
+        #name = self.read_attr(0x03)
+        #print('device name: %s' % name.payload)
 
-        if self.old:
-            ## don't know what these do; Myo Connect sends them, though we get data
-            ## fine without them
-            self.write_attr(0x19, b'\x01\x02\x00\x00')
-            self.write_attr(0x2f, b'\x01\x00')
-            self.write_attr(0x2c, b'\x01\x00')
-            self.write_attr(0x32, b'\x01\x00')
-            self.write_attr(0x35, b'\x01\x00')
+        ## enable IMU data
+        self.write_attr(0x1d, b'\x01\x00')
+        ## enable on/off arm notifications
+        self.write_attr(0x24, b'\x02\x00')
 
-            ## enable EMG data
-            self.write_attr(0x28, b'\x01\x00')
-            ## enable IMU data
-            self.write_attr(0x1d, b'\x01\x00')
+        self.start_raw()
 
-            ## Sampling rate of the underlying EMG sensor, capped to 1000. If it's
-            ## less than 1000, emg_hz is correct. If it is greater, the actual
-            ## framerate starts dropping inversely. Also, if this is much less than
-            ## 1000, EMG data becomes slower to respond to changes. In conclusion,
-            ## 1000 is probably a good value.
-            C = 1000
-            emg_hz = 50
-            ## strength of low-pass filtering of EMG data
-            emg_smooth = 100
-
-            imu_hz = 50
-
-            ## send sensor parameters, or we don't get any data
-            self.write_attr(0x19, pack('BBBBHBBBBB', 2, 9, 2, 1, C, emg_smooth, C // emg_hz, imu_hz, 0, 0))
-
-        else:
-            name = self.read_attr(0x03)
-            print('device name: %s' % name.payload)
-
-            ## enable IMU data
-            self.write_attr(0x1d, b'\x01\x00')
-            ## enable on/off arm notifications
-            self.write_attr(0x24, b'\x02\x00')
-
-            # self.write_attr(0x19, b'\x01\x03\x00\x01\x01')
-            self.start_raw()
+        # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
+        self.write_attr(0x12, b'\x01\x10')
 
         ## add data handlers
         def handle_data(p):
@@ -282,17 +260,11 @@ class MyoRaw(object):
                 acc = vals[4:7]
                 gyro = vals[7:10]
                 self.on_imu(quat, acc, gyro)
-            elif attr == 0x23:
-                typ, val, xdir = unpack('3B', pay)
-
-                if typ == 1: # on arm
-                    self.on_arm(Arm(val), XDirection(xdir))
-                elif typ == 2: # removed from arm
-                    self.on_arm(Arm.UNKNOWN, XDirection.UNKNOWN)
-                elif typ == 3: # pose
-                    self.on_pose(Pose(val))
-            else:
-                print('data with unknown attr: %02X %s' % (attr, p))
+            elif attr == 0x11:
+                # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
+                # For battery
+                battery_level = ord(pay)
+                self.on_battery(battery_level)
 
         self.bt.add_handler(handle_data)
 
@@ -301,14 +273,14 @@ class MyoRaw(object):
         if self.conn is not None:
             self.bt.write_attr(self.conn, attr, val)
 
+    def disconnect(self):
+        if self.conn is not None:
+            self.bt.disconnect(self.conn)
+
     def read_attr(self, attr):
         if self.conn is not None:
             return self.bt.read_attr(self.conn, attr)
         return None
-
-    def disconnect(self):
-        if self.conn is not None:
-            self.bt.disconnect(self.conn)
 
     def start_raw(self):
         '''Sending this sequence for v1.0 firmware seems to enable both raw data and
@@ -316,65 +288,14 @@ class MyoRaw(object):
         '''
 
         self.write_attr(0x28, b'\x01\x00')
-        self.write_attr(0x19, b'\x01\x03\x01\x01\x00')
+        #self.write_attr(0x19, b'\x01\x03\x01\x01\x00')
         self.write_attr(0x19, b'\x01\x03\x01\x01\x01')
-
-    def mc_start_collection(self):
-        '''Myo Connect sends this sequence (or a reordering) when starting data
-        collection for v1.0 firmware; this enables raw data but disables arm and
-        pose notifications.
-        '''
-
-        self.write_attr(0x28, b'\x01\x00')
-        self.write_attr(0x1d, b'\x01\x00')
-        self.write_attr(0x24, b'\x02\x00')
-        self.write_attr(0x19, b'\x01\x03\x01\x01\x01')
-        self.write_attr(0x28, b'\x01\x00')
-        self.write_attr(0x1d, b'\x01\x00')
-        self.write_attr(0x19, b'\x09\x01\x01\x00\x00')
-        self.write_attr(0x1d, b'\x01\x00')
-        self.write_attr(0x19, b'\x01\x03\x00\x01\x00')
-        self.write_attr(0x28, b'\x01\x00')
-        self.write_attr(0x1d, b'\x01\x00')
-        self.write_attr(0x19, b'\x01\x03\x01\x01\x00')
-
-    def mc_end_collection(self):
-        '''Myo Connect sends this sequence (or a reordering) when ending data collection
-        for v1.0 firmware; this reenables arm and pose notifications, but
-        doesn't disable raw data.
-        '''
-
-        self.write_attr(0x28, b'\x01\x00')
-        self.write_attr(0x1d, b'\x01\x00')
-        self.write_attr(0x24, b'\x02\x00')
-        self.write_attr(0x19, b'\x01\x03\x01\x01\x01')
-        self.write_attr(0x19, b'\x09\x01\x00\x00\x00')
-        self.write_attr(0x1d, b'\x01\x00')
-        self.write_attr(0x24, b'\x02\x00')
-        self.write_attr(0x19, b'\x01\x03\x00\x01\x01')
-        self.write_attr(0x28, b'\x01\x00')
-        self.write_attr(0x1d, b'\x01\x00')
-        self.write_attr(0x24, b'\x02\x00')
-        self.write_attr(0x19, b'\x01\x03\x01\x01\x01')
-
-    def vibrate(self, length):
-        if length in xrange(1, 4):
-            ## first byte tells it to vibrate; purpose of second byte is unknown
-            self.write_attr(0x19, pack('3B', 3, 1, length))
-
 
     def add_emg_handler(self, h):
         self.emg_handlers.append(h)
 
     def add_imu_handler(self, h):
         self.imu_handlers.append(h)
-
-    def add_pose_handler(self, h):
-        self.pose_handlers.append(h)
-
-    def add_arm_handler(self, h):
-        self.arm_handlers.append(h)
-
 
     def on_emg(self, emg, moving):
         for h in self.emg_handlers:
@@ -384,34 +305,26 @@ class MyoRaw(object):
         for h in self.imu_handlers:
             h(quat, acc, gyro)
 
-    def on_pose(self, p):
-        for h in self.pose_handlers:
-            h(p)
+    # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
+    def sleep_mode(self, mode):
+        # Added to prevent Myo from sleeping.
+        # mode = 0 enables sleep mode, mode = 1 disables sleep mode
+        self.write_attr(0x19, pack('3B', 9, 1, mode))
 
-    def on_arm(self, arm, xdir):
-        for h in self.arm_handlers:
-            h(arm, xdir)
+    def add_battery_handler(self, h):
+        self.battery_handlers.append(h)
+
+    def on_battery(self, battery_level):
+        for h in self.battery_handlers:
+            h(battery_level)
+
+    def set_leds(self, logo, line):
+        self.write_attr(0x19, pack('8B', 6, 6, *(logo + line)))
+    ########
 
 
 if __name__ == '__main__':
-    last_vals = None
     m = MyoRaw(sys.argv[1] if len(sys.argv) >= 2 else None)
-
-
-    '''
-    0 - fist clench
-    1 - hand wide open
-    2 - relaxed
-    3 - scissors
-    
-    
-    2 - finger gun with thumb up
-    3 - scissors
-    4 - spock
-    '''
-    label = 3
-
-    participant = "David3"
 
     currValues = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     prevValues = [0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -421,33 +334,33 @@ if __name__ == '__main__':
         for i in range(0, 8):
             currValues[i] = emg[i]
 
-        ## print framerate of received data
-        times.append(time.time())
-        if len(times) > 20:
-            #print((len(times) - 1) / (times[-1] - times[0]))
-            times.pop(0)
+    def proc_battery(battery_level):
+        # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
+        #print("Battery Level: %d" % battery_level)
+        if battery_level < 5:
+            m.set_leds([255, 0, 0], [255, 0, 0])
+        elif battery_level < 50 and battery_level >= 5:
+            m.set_leds([255, 80, 127], [255, 80, 127])
+        else:
+            #m.set_leds([128, 128, 255], [128, 128, 255]))
+            m.set_leds([0, 255, 0], [0, 255, 0])
 
     '''
-    def proc_imu(quat, acc, gyro, times=[]):
-        #print("acc: ", acc)
-        #print("gyro: ", gyro)
-        
-        for i in range(0, 3):
-            currValues[8 + i] = quat[i + 1]
-        for i in range(0, 3):
-            currValues[11 + i] = acc[i]
-            currValues[14 + i] = gyro[i]
-        
-        times.append(time.time())
-        if len(times) > 20:
-            times.pop(0)
-`'''
-    m.add_emg_handler(proc_emg)
-    #m.add_imu_handler(proc_imu)
-    m.connect()
+    0 - fist clench - lightly
+    1 - hand wide open - hard
+    2 - relaxed - relaxed
+    3 - scissors - hard
+    4 - rock symbol - medium
+    5 - thumbs up - hard
+    '''
 
-    m.add_arm_handler(lambda arm, xdir: print('arm', arm, 'xdir', xdir))
-    m.add_pose_handler(lambda p: print('pose', p))
+    label = 5
+    participant = "Jay3"
+
+    m.add_emg_handler(proc_emg)
+    m.add_battery_handler(proc_battery) # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
+    m.connect()
+    m.sleep_mode(1) # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
 
     numpyArray = np.array([None, None, None, None, None, None, None, None, None])
 
@@ -483,4 +396,3 @@ if __name__ == '__main__':
         pass
     finally:
         m.disconnect()
-        print()
