@@ -23,6 +23,8 @@ public class Socket_Receive : MonoBehaviour {
 		byte[] received_bytes = client.Receive(ref IP_end_point);
 		string message_received = System.Text.Encoding.ASCII.GetString(received_bytes);
 		string gesture = message_received.Substring(0, 1);
+		message_received = message_received.Substring(1);
+		//float[] acceleration = new float[3]{, , }
 		//Debug.Log(gesture);
 		Debug.Log(message_received);
 	}
