@@ -2,8 +2,94 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Linq;
 
 public class New_Hand_Manipulate : MonoBehaviour {
+
+	private static string IP_address = "127.0.0.1";
+	private static int port = 2048;
+	UdpClient client;
+	IPEndPoint IP_end_point;
+
+	public void UDP_setup() {
+		client = new UdpClient(port);
+		client.Client.ReceiveBufferSize = 256; // Set buffer size to be as small as possible to minimize buffer clog (received data is up to 100 bytes approximately so set buffer size to 256 considering factor of safety of approximately 2.5
+		IP_end_point = new IPEndPoint(IPAddress.Parse(IP_address), 0);
+	}
+
+	public void UDP_receive() {
+		byte[] received_bytes = client.Receive(ref IP_end_point);
+		string message_received = System.Text.Encoding.ASCII.GetString(received_bytes);
+		string gesture = message_received.Substring(0, 1);
+		//message_received = message_received.Substring(2);
+		//float[] acceleration = new float[3]{, , }
+		//Debug.Log(gesture);
+
+
+		/*
+		0 - fist clench - lightly
+		1 - hand wide open - hard
+		2 - relaxed - relaxed
+		3 - scissors - hard
+		4 - rock symbol - medium
+		5 - thumbs up - hard
+		*/
+		
+		switch( gesture ){
+			case "0":
+				rotationF[0] = 2;
+				rotationF[1] = 2;
+				rotationF[2] = 2;
+				rotationF[3] = 2;
+				rotationF[4] = 2;
+				break;
+			case "1":
+				rotationF[0] = 1;
+				rotationF[1] = 1;
+				rotationF[2] = 1;
+				rotationF[3] = 1;
+				rotationF[4] = 1;
+				break;
+			case "2":
+				rotationF[0] = 0;
+				rotationF[1] = 0;
+				rotationF[2] = 0;
+				rotationF[3] = 0;
+				rotationF[4] = 0;
+				break;
+			case "3":
+				rotationF[0] = 2;
+				rotationF[1] = 1;
+				rotationF[2] = 1;
+				rotationF[3] = 2;
+				rotationF[4] = 2;
+				break;
+			case "4":
+				rotationF[0] = 1;
+				rotationF[1] = 1;
+				rotationF[2] = 2;
+				rotationF[3] = 2;
+				rotationF[4] = 1;
+				break;
+			case "5":
+				rotationF[0] = 1;
+				rotationF[1] = 2;
+				rotationF[2] = 2;
+				rotationF[3] = 2;
+				rotationF[4] = 2;
+				break;
+			default:
+				rotationF[0] = 0;
+				rotationF[1] = 0;
+				rotationF[2] = 0;
+				rotationF[3] = 0;
+				rotationF[4] = 0;
+				break;
+		}
+		
+	}
 
 	public readonly Vector3[,,] angleCases = new Vector3[3, 5, 3]
 		// Relaxed positions for all fingers	[0]
@@ -38,7 +124,7 @@ public class New_Hand_Manipulate : MonoBehaviour {
 	public GameObject hand;
 	public float rotationSpeed = 5f;
 
-	public int gesture = 0;
+	//public int gesture = 0;
 	public int[] rotationF = new int[5] { 0, 0, 0, 0, 0 };  //stores the future individual finger rotations based on the gesture number recieved 
 	
 	void cycleFingers() {
@@ -127,10 +213,13 @@ public class New_Hand_Manipulate : MonoBehaviour {
 				jointF = jointF.transform.GetChild(0).gameObject;
 			}
 		}
+
+		UDP_setup();
 	}
 	
 	// Update is called once per frame
 	void Update () {
+		UDP_receive();
 		cycleFingers();
 	}
 }
