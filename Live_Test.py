@@ -334,10 +334,11 @@ if __name__ == '__main__':
     time_interval = 0.5
     start_acceleration = [0, 0, 0]
     first = True
+    quaternion = [0, 0, 0]
 
     windowSize = 10; #adjust this to change the queue length
     queue = Queue.Queue(8, windowSize);
-    predictions_queue = Queue.Queue(8, 75)
+    predictions_queue = Queue.Queue(8, 50) # 90
 
     def proc_emg(emg, moving, times=[]):
         #print("emg: ", emg)
@@ -350,6 +351,7 @@ if __name__ == '__main__':
         for i in range(0, 3):
             accelerometer[i] = acc[i] / 100
             gyroscope[i] = gyro[i]
+            quaternion[i] = quat[i]
 
     def proc_battery(battery_level):
         # Not originally in myo-raw repo, see: https://github.com/dzhu/myo-raw/pull/23/commits/680775071d0dd4defb88b35f91d9122c0645eedb
@@ -363,11 +365,12 @@ if __name__ == '__main__':
             m.set_leds([0, 255, 0], [0, 255, 0])
 
     '''
-    0 - fist clench
-    1 - hand wide open
-    2 - finger gun with thumb up
-    3 - scissors
-    4 - spock
+    0 - fist clench - lightly
+    1 - hand wide open - hard
+    2 - relaxed - relaxed
+    3 - scissors - hard
+    4 - rock symbol - medium
+    5 - thumbs up - hard
     '''
 
     m.add_emg_handler(proc_emg)
@@ -396,6 +399,7 @@ if __name__ == '__main__':
             predictions_queue.update(predict)
 
             if time.time() - interval_time >= time_interval:
+                '''
                 if first:
                     start_acceleration = copy.deepcopy(accelerometer)
                     first = False
@@ -409,6 +413,7 @@ if __name__ == '__main__':
                     if(abs(gyroscope[i]) < 20): gyroscope[i] = 0
                     gyroscope[i] *= 2.5
                     gyroscope[i] /= 1000
+                '''
 
                 #distances[0] *= -1
                 #distances[2] *= -1
@@ -425,9 +430,11 @@ if __name__ == '__main__':
                 start_acceleration = np.dot(R, start_acceleration)
                 '''
 
-                to_send = str(predictions_queue.mode) + "/" + str("{0:.5f}".format(distances[0])) + "/" + str("{0:.5f}".format(distances[1])) + "/" + str("{0:.5f}".format(distances[2])) \
+                to_send = str(predictions_queue.mode) + "/" + str("{0:.5f}".format(accelerometer[0])) + "/" + str("{0:.5f}".format(accelerometer[1])) + "/" + str("{0:.5f}".format(accelerometer[2])) \
                           + "/" + str(gyroscope[0]) + "/" + str(gyroscope[1]) + "/" + str(gyroscope[2])
                 print(to_send)
+                print(quaternion[0:3])
+                #print(sum(quaternion[0:3])))
 
                 curr_socket.sendto(bytes(to_send, "utf-8"), (address, port)) # Sending data up to 100 bytes in size approximately
 
